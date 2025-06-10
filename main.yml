@@ -3,7 +3,7 @@
   hosts: all
   become: true
   vars:
-    postgresql_version: "15"  # Cambia versione se necessario
+    postgresql_version: "16"  # Cambia versione se necessario
 
   tasks:
     - name: Gather OS family facts
