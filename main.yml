@@ -1,0 +1,61 @@
+---
+- name: Install PostgreSQL on RedHat and Debian based systems
+  hosts: all
+  become: true
+  vars:
+    postgresql_version: "15"  # Cambia versione se necessario
+
+  tasks:
+    - name: Gather OS family facts
+      ansible.builtin.setup:
+        filter: ansible_os_family
+
+    - name: Add PostgreSQL repo on RedHat-based systems
+      when: ansible_facts['os_family'] == "RedHat"
+      block:
+        - name: Install repository RPM
+          ansible.builtin.yum:
+            name: https://download.postgresql.org/pub/repos/yum/{{ postgresql_version }}/redhat/rhel-{{ ansible_facts['distribution_major_version'] }}-x86_64/pgdg-redhat-repo-latest.noarch.rpm
+            state: present
+
+        - name: Disable built-in PostgreSQL module (RHEL 8+)
+          ansible.builtin.command: dnf -qy module disable postgresql
+          when: ansible_facts['distribution_major_version'] | int >= 8
+          args:
+            warn: false
+
+    - name: Add PostgreSQL repo on Debian-based systems
+      when: ansible_facts['os_family'] == "Debian"
+      block:
+        - name: Install required packages
+          ansible.builtin.apt:
+            name:
+              - wget
+              - gnupg
+              - lsb-release
+            state: present
+            update_cache: yes
+
+        - name: Add PostgreSQL APT key
+          ansible.builtin.apt_key:
+            url: https://www.postgresql.org/media/keys/ACCC4CF8.asc
+            state: present
+
+        - name: Add PostgreSQL APT repository
+          ansible.builtin.apt_repository:
+            repo: "deb http://apt.postgresql.org/pub/repos/apt {{ ansible_facts['lsb']['codename'] }}-pgdg main"
+            state: present
+            filename: "pgdg.list"
+            update_cache: yes
+
+    - name: Install PostgreSQL server
+      ansible.builtin.package:
+        name: "postgresql-{{ postgresql_version }}"
+        state: present
+
+    - name: Ensure PostgreSQL is started and enabled
+      ansible.builtin.service:
+        name: postgresql
+        state: started
+        enabled: yes
+
